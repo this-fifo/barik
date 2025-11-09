@@ -4,45 +4,71 @@ import Foundation
 
 class SpacesViewModel: ObservableObject {
     @Published var spaces: [AnySpace] = []
-    private var timer: Timer?
     private var provider: AnySpacesProvider?
+    private var reloadObserver: NSObjectProtocol?
+    private let loadQueue = DispatchQueue(
+        label: "io.barik.spaces.reload", qos: .background)
+    private var isLoading = false
+    private var pendingReload = false
+    private var cachedSpaces: [AnySpace] = []
+    private var focusTimer: Timer?
 
     init() {
-        let runningApps = NSWorkspace.shared.runningApplications.compactMap {
-            $0.localizedName?.lowercased()
-        }
-        if runningApps.contains("yabai") {
-            provider = AnySpacesProvider(YabaiSpacesProvider())
-        } else if runningApps.contains("aerospace") {
-            provider = AnySpacesProvider(AerospaceSpacesProvider())
-        } else {
-            provider = nil
-        }
-        startMonitoring()
+        let distributedCenter = DistributedNotificationCenter.default()
+        reloadObserver = distributedCenter.addObserver(
+            forName: .barikReloadSpaces,
+            object: nil,
+            queue: .main,
+            using: { [weak self] notification in
+                let providedFocusId =
+                    notification.userInfo?["focusedSpaceId"] as? String
+                let providedWindowId =
+                    (notification.userInfo?["focusedWindowId"] as? String)
+                    .flatMap(Int.init)
+                self?.loadSpaces(
+                    triggeredByEvent: true,
+                    providedFocusId: providedFocusId,
+                    providedWindowId: providedWindowId)
+            })
+        loadSpaces()
+        startFocusPolling()
     }
 
     deinit {
-        stopMonitoring()
-    }
-
-    private func startMonitoring() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) {
-            [weak self] _ in
-            self?.loadSpaces()
+        if let observer = reloadObserver {
+            DistributedNotificationCenter.default().removeObserver(observer)
         }
-        loadSpaces()
+        focusTimer?.invalidate()
     }
 
-    private func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func loadSpaces() {
-        DispatchQueue.global(qos: .background).async {
+    private func loadSpaces(
+        triggeredByEvent: Bool = false, providedFocusId: String? = nil,
+        providedWindowId: Int? = nil
+    ) {
+        loadQueue.async { [weak self] in
+            guard let self else { return }
+            self.ensureProvider()
+            if triggeredByEvent {
+                self.applyQuickFocusUpdateOnQueue(
+                    providedFocusId: providedFocusId,
+                    providedWindowId: providedWindowId)
+            }
+            if self.isLoading {
+                self.pendingReload = true
+                return
+            }
+            self.isLoading = true
+            self.pendingReload = false
+            defer {
+                self.isLoading = false
+                if self.pendingReload {
+                    self.loadSpaces()
+                }
+            }
             guard let provider = self.provider,
                 let spaces = provider.getSpacesWithWindows()
             else {
+                self.cachedSpaces = []
                 DispatchQueue.main.async {
                     self.spaces = []
                 }
@@ -56,9 +82,89 @@ class SpacesViewModel: ObservableObject {
                 // sort by alphabet
                 return $0.id < $1.id
             }
+            self.cachedSpaces = sortedSpaces
             DispatchQueue.main.async {
                 self.spaces = sortedSpaces
             }
+        }
+    }
+
+    private func ensureProvider() {
+        if provider != nil { return }
+        let runningApps = NSWorkspace.shared.runningApplications.compactMap {
+            $0.localizedName?.lowercased()
+        }
+        if runningApps.contains("yabai") {
+            provider = AnySpacesProvider(YabaiSpacesProvider())
+        } else if runningApps.contains("aerospace") {
+            provider = AnySpacesProvider(AerospaceSpacesProvider())
+        }
+    }
+
+    private func applyQuickFocusUpdateOnQueue(
+        providedFocusId: String?, providedWindowId: Int?
+    ) {
+        guard !cachedSpaces.isEmpty else {
+            return
+        }
+        let focusId = providedFocusId ?? provider?.getFocusedSpaceId()
+        let windowId = providedWindowId
+        if focusId == nil && windowId == nil { return }
+        var changed = false
+        let updatedSpaces = cachedSpaces.map { space -> AnySpace in
+            var updatedWindows = space.windows
+            if let windowId {
+                updatedWindows = space.windows.map { window in
+                    let newFocus = (window.id == windowId)
+                    if window.isFocused != newFocus { changed = true }
+                    return window.withFocus(newFocus)
+                }
+            }
+            var updatedSpace = space
+            if let focusId {
+                let newFocus = (space.id == focusId)
+                if space.isFocused != newFocus {
+                    changed = true
+                    updatedSpace = space.withFocus(newFocus)
+                }
+            }
+            if updatedWindows != space.windows {
+                changed = true
+                updatedSpace = AnySpace(
+                    id: updatedSpace.id,
+                    isFocused: updatedSpace.isFocused,
+                    windows: updatedWindows)
+            }
+            return updatedSpace
+        }
+        if changed {
+            cachedSpaces = updatedSpaces
+            let snapshot = updatedSpaces
+            DispatchQueue.main.async {
+                self.spaces = snapshot
+            }
+        }
+    }
+
+    private func startFocusPolling() {
+        // Poll focused window every 0.5 seconds
+        focusTimer = Timer.scheduledTimer(
+            withTimeInterval: 0.5,
+            repeats: true
+        ) { [weak self] _ in
+            self?.pollFocusedWindow()
+        }
+    }
+
+    private func pollFocusedWindow() {
+        loadQueue.async { [weak self] in
+            guard let self, let provider = self.provider else { return }
+            guard let windowId = provider.getFocusedWindowId() else { return }
+
+            // Update focus using the quick update mechanism
+            self.applyQuickFocusUpdateOnQueue(
+                providedFocusId: nil,
+                providedWindowId: windowId)
         }
     }
 
