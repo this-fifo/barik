@@ -1,24 +1,46 @@
 import Foundation
 
-class AerospaceSpacesProvider: SpacesProvider, SwitchableSpacesProvider {
+class AerospaceSpacesProvider: SpacesProvider, SwitchableSpacesProvider, FocusAwareSpacesProvider {
     typealias SpaceType = AeroSpace
-    let executablePath = ConfigManager.shared.config.aerospace.path
+    let commandRunner: AerospaceCommandRunner = .init(
+        executablePath: ConfigManager.shared.config.aerospace.path)
+
+    // Cache last known focused space/window to avoid extra queries
+    private var cachedFocusedSpaceId: String?
+    private var cachedFocusedWindowId: Int?
+
+    private struct AerospaceState {
+        let spaces: [AeroSpace]
+        let windows: [AeroWindow]
+        let focusedSpaceId: String?
+        let focusedWindowId: Int?
+    }
 
     func getSpacesWithWindows() -> [AeroSpace]? {
-        guard var spaces = fetchSpaces(), let windows = fetchWindows() else {
+        guard let state = fetchState() else {
             return nil
         }
-        if let focusedSpace = fetchFocusedSpace() {
+        var spaces = state.spaces
+        let fallbackSpaceId = state.focusedSpaceId
+            ?? spaces.first(where: { $0.isFocused }).map { $0.id }
+        if let fallbackSpaceId {
+            // Update cache
+            cachedFocusedSpaceId = fallbackSpaceId
             for i in 0..<spaces.count {
-                spaces[i].isFocused = (spaces[i].id == focusedSpace.id)
+                spaces[i].isFocused = (spaces[i].id == fallbackSpaceId)
             }
         }
-        let focusedWindow = fetchFocusedWindow()
         var spaceDict = Dictionary(
             uniqueKeysWithValues: spaces.map { ($0.id, $0) })
-        for window in windows {
+        let focusedWindowId = state.focusedWindowId
+            ?? state.windows.first(where: { $0.isFocused }).map { $0.id }
+        // Update cache
+        if let focusedWindowId {
+            cachedFocusedWindowId = focusedWindowId
+        }
+        for window in state.windows {
             var mutableWindow = window
-            if let focused = focusedWindow, window.id == focused.id {
+            if let focusedWindowId, window.id == focusedWindowId {
                 mutableWindow.isFocused = true
             }
             if let ws = mutableWindow.workspace, !ws.isEmpty {
@@ -26,11 +48,9 @@ class AerospaceSpacesProvider: SpacesProvider, SwitchableSpacesProvider {
                     space.windows.append(mutableWindow)
                     spaceDict[ws] = space
                 }
-            } else if let focusedSpace = fetchFocusedSpace() {
-                if var space = spaceDict[focusedSpace.id] {
-                    space.windows.append(mutableWindow)
-                    spaceDict[focusedSpace.id] = space
-                }
+            } else if let fallbackSpaceId, var space = spaceDict[fallbackSpaceId] {
+                space.windows.append(mutableWindow)
+                spaceDict[fallbackSpaceId] = space
             }
         }
         var resultSpaces = Array(spaceDict.values)
@@ -42,27 +62,80 @@ class AerospaceSpacesProvider: SpacesProvider, SwitchableSpacesProvider {
 
     func focusSpace(spaceId: String, needWindowFocus: Bool) {
         _ = runAerospaceCommand(arguments: ["workspace", spaceId])
+        // Update cache immediately after focus change
+        cachedFocusedSpaceId = spaceId
     }
 
     func focusWindow(windowId: String) {
         _ = runAerospaceCommand(arguments: ["focus", "--window-id", windowId])
     }
 
+    func getFocusedSpaceId() -> String? {
+        // Always fetch fresh data for polling (no cache)
+        // Cache is only used in getSpacesWithWindows() for optimization
+        return fetchFocusedSpace()?.id
+    }
+
+    func getFocusedWindowId() -> Int? {
+        // Always fetch fresh data for polling (no cache)
+        // Cache is only used in getSpacesWithWindows() for optimization
+        return fetchFocusedWindow()?.id
+    }
+
     private func runAerospaceCommand(arguments: [String]) -> Data? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = arguments
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        do {
-            try process.run()
-        } catch {
-            print("Aerospace error: \(error)")
+        return commandRunner.run(arguments: arguments)
+    }
+
+    private func fetchState() -> AerospaceState? {
+        let group = DispatchGroup()
+        var spaces: [AeroSpace]?
+        var windows: [AeroWindow]?
+        var focusedSpace: AeroSpace?
+        var focusedWindow: AeroWindow?
+
+        let fetchQueue = DispatchQueue(
+            label: "io.barik.aerospace.fetch", attributes: .concurrent)
+
+        // Fetch all data in parallel (4 concurrent requests)
+        group.enter()
+        fetchQueue.async {
+            spaces = self.fetchSpaces()
+            group.leave()
+        }
+
+        group.enter()
+        fetchQueue.async {
+            windows = self.fetchWindows()
+            group.leave()
+        }
+
+        group.enter()
+        fetchQueue.async {
+            focusedSpace = self.fetchFocusedSpace()
+            group.leave()
+        }
+
+        group.enter()
+        fetchQueue.async {
+            focusedWindow = self.fetchFocusedWindow()
+            group.leave()
+        }
+
+        group.wait()
+
+        guard let resolvedSpaces = spaces, let resolvedWindows = windows else {
             return nil
         }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return data
+
+        // Use focused queries results (--all queries don't include focus info)
+        let focusedSpaceId = focusedSpace?.id
+        let focusedWindowId = focusedWindow?.id
+
+        return AerospaceState(
+            spaces: resolvedSpaces,
+            windows: resolvedWindows,
+            focusedSpaceId: focusedSpaceId,
+            focusedWindowId: focusedWindowId)
     }
 
     private func fetchSpaces() -> [AeroSpace]? {
@@ -100,7 +173,7 @@ class AerospaceSpacesProvider: SpacesProvider, SwitchableSpacesProvider {
         }
     }
 
-    private func fetchFocusedSpace() -> AeroSpace? {
+    func fetchFocusedSpace() -> AeroSpace? {
         guard
             let data = runAerospaceCommand(arguments: [
                 "list-workspaces", "--focused", "--json",

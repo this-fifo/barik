@@ -1,6 +1,6 @@
 import Foundation
 
-class YabaiSpacesProvider: SpacesProvider, SwitchableSpacesProvider {
+class YabaiSpacesProvider: SpacesProvider, SwitchableSpacesProvider, FocusAwareSpacesProvider {
     typealias SpaceType = YabaiSpace
     let executablePath = ConfigManager.shared.config.yabai.path
 
@@ -97,5 +97,47 @@ class YabaiSpacesProvider: SpacesProvider, SwitchableSpacesProvider {
 
     func focusWindow(windowId: String) {
         _ = runYabaiCommand(arguments: ["-m", "window", "--focus", windowId])
+    }
+
+    func getFocusedSpaceId() -> String? {
+        guard let space = fetchFocusedSpace() else { return nil }
+        return String(space.id)
+    }
+
+    func getFocusedWindowId() -> Int? {
+        guard let window = fetchFocusedWindow() else { return nil }
+        return window.id
+    }
+
+    private func fetchFocusedSpace() -> YabaiSpace? {
+        guard
+            let data = runYabaiCommand(
+                arguments: ["-m", "query", "--spaces", "--space"])
+        else {
+            return nil
+        }
+        let decoder = JSONDecoder()
+        do {
+            return try decoder.decode(YabaiSpace.self, from: data)
+        } catch {
+            print("Decode yabai focused space error: \(error)")
+            return nil
+        }
+    }
+
+    private func fetchFocusedWindow() -> YabaiWindow? {
+        guard
+            let data = runYabaiCommand(
+                arguments: ["-m", "query", "--windows", "--window"])
+        else {
+            return nil
+        }
+        let decoder = JSONDecoder()
+        do {
+            return try decoder.decode(YabaiWindow.self, from: data)
+        } catch {
+            print("Decode yabai focused window error: \(error)")
+            return nil
+        }
     }
 }
