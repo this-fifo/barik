@@ -72,7 +72,7 @@ class YabaiSpacesProvider: SpacesProvider, SwitchableSpacesProvider {
         for i in 0..<resultSpaces.count {
             resultSpaces[i].windows.sort { $0.stackIndex < $1.stackIndex }
         }
-        return resultSpaces.filter { !$0.windows.isEmpty }
+        return resultSpaces
     }
 
     func focusSpace(spaceId: String, needWindowFocus: Bool) {
