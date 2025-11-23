@@ -4,8 +4,8 @@ import Foundation
 
 class SpacesViewModel: ObservableObject {
     @Published var spaces: [AnySpace] = []
-    private var timer: Timer?
     private var provider: AnySpacesProvider?
+    private var fallbackTimer: Timer?
 
     init() {
         let runningApps = NSWorkspace.shared.runningApplications.compactMap {
@@ -13,29 +13,80 @@ class SpacesViewModel: ObservableObject {
         }
         if runningApps.contains("yabai") {
             provider = AnySpacesProvider(YabaiSpacesProvider())
+            startSignalMonitoring()
         } else if runningApps.contains("aerospace") {
             provider = AnySpacesProvider(AerospaceSpacesProvider())
+            startFallbackMonitoring()
         } else {
             provider = nil
         }
-        startMonitoring()
+
+        // Initial load
+        loadSpaces()
     }
 
     deinit {
         stopMonitoring()
     }
 
-    private func startMonitoring() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) {
-            [weak self] _ in
+    /// Start event-driven monitoring using yabai signals (via Darwin notifications)
+    private func startSignalMonitoring() {
+        // Use Darwin notifications (CFNotificationCenter) for low-latency IPC
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        let observer = Unmanaged.passUnretained(self).toOpaque()
+
+        CFNotificationCenterAddObserver(
+            center,
+            observer,
+            { _, observer, name, _, _ in
+                guard let observer = observer else { return }
+                let viewModel = Unmanaged<SpacesViewModel>.fromOpaque(observer).takeUnretainedValue()
+                DispatchQueue.main.async {
+                    viewModel.loadSpaces()
+                }
+            },
+            "com.barik.space_changed" as CFString,
+            nil,
+            .deliverImmediately
+        )
+
+        CFNotificationCenterAddObserver(
+            center,
+            observer,
+            { _, observer, name, _, _ in
+                guard let observer = observer else { return }
+                let viewModel = Unmanaged<SpacesViewModel>.fromOpaque(observer).takeUnretainedValue()
+                DispatchQueue.main.async {
+                    viewModel.loadSpaces()
+                }
+            },
+            "com.barik.window_changed" as CFString,
+            nil,
+            .deliverImmediately
+        )
+
+        // Fallback polling every 0.5s for safety (still 5x better than original 0.1s)
+        fallbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.loadSpaces()
         }
-        loadSpaces()
+    }
+
+    /// Start fallback polling for non-yabai setups
+    private func startFallbackMonitoring() {
+        fallbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.loadSpaces()
+        }
     }
 
     private func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
+        // Remove Darwin notification observers
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        let observer = Unmanaged.passUnretained(self).toOpaque()
+        CFNotificationCenterRemoveObserver(center, observer, nil, nil)
+
+        // Stop fallback timer
+        fallbackTimer?.invalidate()
+        fallbackTimer = nil
     }
 
     private func loadSpaces() {
