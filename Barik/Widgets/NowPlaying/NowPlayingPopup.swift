@@ -1,6 +1,17 @@
 import EventKit
 import SwiftUI
 
+// MARK: - Button Style
+
+/// A button style that scales down when pressed for tactile feedback
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
 struct NowPlayingPopup: View {
     @ObservedObject var configProvider: ConfigProvider
     @State private var selectedVariant: MenuBarPopupVariant = .horizontal
@@ -51,13 +62,20 @@ private struct NowPlayingVerticalPopup: View {
            let duration = song.duration,
            let position = song.position {
             VStack(spacing: 15) {
-                RotateAnimatedCachedImage(
-                    url: song.albumArtURL,
-                    targetSize: CGSize(width: 200, height: 200)
-                ) { image in
-                    image.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                Group {
+                    if let artworkData = song.albumArtData,
+                       let nsImage = NSImage(data: artworkData) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    } else {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.gray.opacity(0.3))
+                    }
                 }
                 .frame(width: 200, height: 200)
+                .id(song.title + song.artist)
                 .scaleEffect(song.state == .paused ? 0.9 : 1)
                 .overlay(
                     song.state == .paused ?
@@ -78,34 +96,65 @@ private struct NowPlayingVerticalPopup: View {
                         .fontWeight(.light)
                 }
 
-                HStack {
-                    Text(timeString(from: position))
-                        .font(.caption)
-                    ProgressView(value: position, total: duration)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .tint(.white)
-                    Text("-" + timeString(from: duration - position))
-                        .font(.caption)
+                VStack(spacing: 4) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(height: 4)
+
+                            Rectangle()
+                                .fill(Color.white)
+                                .frame(width: geometry.size.width * (position / duration), height: 4)
+                        }
+                        .clipShape(Capsule())
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onEnded { value in
+                                    let clickedPosition = max(0, min(value.location.x / geometry.size.width, 1))
+                                    let newPosition = clickedPosition * duration
+                                    playingManager.seek(to: newPosition)
+                                }
+                        )
+                    }
+                    .frame(height: 4)
+
+                    HStack {
+                        Text(timeString(from: position))
+                            .font(.caption)
+                        Spacer()
+                        Text("-" + timeString(from: duration - position))
+                            .font(.caption)
+                    }
+                    .foregroundColor(.gray)
+                    .monospacedDigit()
                 }
-                .foregroundColor(.gray)
-                .monospacedDigit()
 
                 HStack(spacing: 40) {
-                    Image(systemName: "backward.fill")
-                        .font(.system(size: 20))
-                        .onTapGesture { playingManager.previousTrack() }
-                    Image(systemName: song.state == .paused ? "play.fill" : "pause.fill")
-                        .font(.system(size: 30))
-                        .onTapGesture { playingManager.togglePlayPause() }
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: 20))
-                        .onTapGesture { playingManager.nextTrack() }
+                    Button(action: { playingManager.previousTrack() }) {
+                        Image(systemName: "backward.fill")
+                            .font(.system(size: 20))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+
+                    Button(action: { playingManager.togglePlayPause() }) {
+                        Image(systemName: song.state == .paused ? "play.fill" : "pause.fill")
+                            .font(.system(size: 30))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+
+                    Button(action: { playingManager.nextTrack() }) {
+                        Image(systemName: "forward.fill")
+                            .font(.system(size: 20))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 25)
             .padding(.vertical, 30)
             .frame(width: 300)
-            .animation(.easeInOut, value: song.albumArtURL)
+            .animation(.easeInOut, value: song.id)
         }
     }
 }
@@ -120,13 +169,20 @@ struct NowPlayingHorizontalPopup: View {
            let position = song.position {
             VStack(spacing: 15) {
                 HStack(spacing: 15) {
-                    RotateAnimatedCachedImage(
-                        url: song.albumArtURL,
-                        targetSize: CGSize(width: 200, height: 200)
-                    ) { image in
-                        image.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    Group {
+                        if let artworkData = song.albumArtData,
+                           let nsImage = NSImage(data: artworkData) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .scaledToFit()
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        } else {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.gray.opacity(0.3))
+                        }
                     }
                     .frame(width: 60, height: 60)
+                    .id(song.title + song.artist)
                     .scaleEffect(song.state == .paused ? 0.9 : 1)
                     .overlay(
                         song.state == .paused ?
@@ -149,34 +205,65 @@ struct NowPlayingHorizontalPopup: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                HStack {
-                    Text(timeString(from: position))
-                        .font(.caption)
-                    ProgressView(value: position, total: duration)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .tint(.white)
-                    Text("-" + timeString(from: duration - position))
-                        .font(.caption)
+                VStack(spacing: 4) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(height: 4)
+
+                            Rectangle()
+                                .fill(Color.white)
+                                .frame(width: geometry.size.width * (position / duration), height: 4)
+                        }
+                        .clipShape(Capsule())
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onEnded { value in
+                                    let clickedPosition = max(0, min(value.location.x / geometry.size.width, 1))
+                                    let newPosition = clickedPosition * duration
+                                    playingManager.seek(to: newPosition)
+                                }
+                        )
+                    }
+                    .frame(height: 4)
+
+                    HStack {
+                        Text(timeString(from: position))
+                            .font(.caption)
+                        Spacer()
+                        Text("-" + timeString(from: duration - position))
+                            .font(.caption)
+                    }
+                    .foregroundColor(.gray)
+                    .monospacedDigit()
                 }
-                .foregroundColor(.gray)
-                .monospacedDigit()
 
                 HStack(spacing: 40) {
-                    Image(systemName: "backward.fill")
-                        .font(.system(size: 20))
-                        .onTapGesture { playingManager.previousTrack() }
-                    Image(systemName: song.state == .paused ? "play.fill" : "pause.fill")
-                        .font(.system(size: 30))
-                        .onTapGesture { playingManager.togglePlayPause() }
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: 20))
-                        .onTapGesture { playingManager.nextTrack() }
+                    Button(action: { playingManager.previousTrack() }) {
+                        Image(systemName: "backward.fill")
+                            .font(.system(size: 20))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+
+                    Button(action: { playingManager.togglePlayPause() }) {
+                        Image(systemName: song.state == .paused ? "play.fill" : "pause.fill")
+                            .font(.system(size: 30))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+
+                    Button(action: { playingManager.nextTrack() }) {
+                        Image(systemName: "forward.fill")
+                            .font(.system(size: 20))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 25)
             .padding(.vertical, 20)
             .frame(width: 300, height: 180)
-            .animation(.easeInOut, value: song.albumArtURL)
+            .animation(.easeInOut, value: song.id)
         }
     }
 }

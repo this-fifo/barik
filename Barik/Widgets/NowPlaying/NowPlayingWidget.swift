@@ -125,23 +125,49 @@ struct AlbumArtView: View {
     let song: NowPlayingSong
 
     var body: some View {
-        ZStack {
-            FadeAnimatedCachedImage(
-                url: song.albumArtURL,
-                targetSize: CGSize(width: 20, height: 20)
-            )
-            .frame(width: 20, height: 20)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .scaleEffect(song.state == .paused ? 0.9 : 1)
-            .brightness(song.state == .paused ? -0.3 : 0)
+        AlbumArtContent(
+            artworkData: song.albumArtData,
+            title: song.title,
+            artist: song.artist,
+            isPaused: song.state == .paused
+        )
+    }
+}
 
-            if song.state == .paused {
+/// Separated artwork content that only updates when song changes, not position
+private struct AlbumArtContent: View, Equatable {
+    let artworkData: Data?
+    let title: String
+    let artist: String
+    let isPaused: Bool
+
+    static func == (lhs: AlbumArtContent, rhs: AlbumArtContent) -> Bool {
+        lhs.title == rhs.title && lhs.artist == rhs.artist && lhs.isPaused == rhs.isPaused
+    }
+
+    var body: some View {
+        ZStack {
+            if let artworkData = artworkData,
+               let nsImage = NSImage(data: artworkData) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .frame(width: 20, height: 20)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .scaleEffect(isPaused ? 0.9 : 1)
+                    .brightness(isPaused ? -0.3 : 0)
+            } else {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 20, height: 20)
+            }
+
+            if isPaused {
                 Image(systemName: "pause.fill")
                     .foregroundColor(.icon)
                     .transition(.blurReplace)
             }
         }
-        .animation(.smooth(duration: 0.1), value: song.state == .paused)
+        .animation(.smooth(duration: 0.1), value: isPaused)
     }
 }
 
