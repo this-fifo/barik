@@ -9,7 +9,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showFatalConfigError(message: error)
             return
         }
-        
+
+        // Initialize sleep/wake manager to pause services during sleep
+        _ = SleepWakeManager.shared
+
         // Show "What's New" banner if the app version is outdated
         if !VersionChecker.isLatestVersion() {
             VersionChecker.updateVersionFile()
@@ -18,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     name: Notification.Name("ShowWhatsNewBanner"), object: nil)
             }
         }
-        
+
         MenuBarPopup.setup()
         setupPanels()
 

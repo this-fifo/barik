@@ -23,15 +23,44 @@ class CalendarManager: ObservableObject {
     @Published var tomorrowsEvents: [EKEvent] = []
     private let eventStore = EKEventStore()
     private var timer: Timer?
+    private var sleepWakeObservers: [NSObjectProtocol] = []
 
     init(configProvider: ConfigProvider) {
         self.configProvider = configProvider
         requestAccess()
         startMonitoring()
+        observeSleepWake()
     }
 
     deinit {
         stopMonitoring()
+        removeSleepWakeObservers()
+    }
+
+    private func observeSleepWake() {
+        let sleepObserver = NotificationCenter.default.addObserver(
+            forName: SleepWakeManager.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.timer?.invalidate()
+            self?.timer = nil
+        }
+
+        let wakeObserver = NotificationCenter.default.addObserver(
+            forName: SleepWakeManager.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.startMonitoring()
+        }
+
+        sleepWakeObservers.append(contentsOf: [sleepObserver, wakeObserver])
+    }
+
+    private func removeSleepWakeObservers() {
+        sleepWakeObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        sleepWakeObservers.removeAll()
     }
 
     private func startMonitoring() {

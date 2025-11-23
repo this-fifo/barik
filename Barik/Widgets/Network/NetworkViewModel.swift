@@ -54,6 +54,7 @@ final class NetworkStatusViewModel: NSObject, ObservableObject,
 
     private var timer: Timer?
     private let locationManager = CLLocationManager()
+    private var sleepWakeObservers: [NSObjectProtocol] = []
 
     override init() {
         super.init()
@@ -61,11 +62,39 @@ final class NetworkStatusViewModel: NSObject, ObservableObject,
         locationManager.requestWhenInUseAuthorization()
         startNetworkMonitoring()
         startWiFiMonitoring()
+        observeSleepWake()
     }
 
     deinit {
         stopNetworkMonitoring()
         stopWiFiMonitoring()
+        removeSleepWakeObservers()
+    }
+
+    private func observeSleepWake() {
+        let sleepObserver = NotificationCenter.default.addObserver(
+            forName: SleepWakeManager.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.timer?.invalidate()
+            self?.timer = nil
+        }
+
+        let wakeObserver = NotificationCenter.default.addObserver(
+            forName: SleepWakeManager.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.startWiFiMonitoring()
+        }
+
+        sleepWakeObservers.append(contentsOf: [sleepObserver, wakeObserver])
+    }
+
+    private func removeSleepWakeObservers() {
+        sleepWakeObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        sleepWakeObservers.removeAll()
     }
 
     // MARK: — NWPathMonitor for overall network status.

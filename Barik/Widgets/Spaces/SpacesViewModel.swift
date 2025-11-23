@@ -6,6 +6,7 @@ class SpacesViewModel: ObservableObject {
     @Published var spaces: [AnySpace] = []
     private var provider: AnySpacesProvider?
     private var fallbackTimer: Timer?
+    private var sleepWakeObservers: [NSObjectProtocol] = []
 
     init() {
         let runningApps = NSWorkspace.shared.runningApplications.compactMap {
@@ -23,10 +24,63 @@ class SpacesViewModel: ObservableObject {
 
         // Initial load
         loadSpaces()
+
+        // Observe sleep/wake events to pause/resume monitoring
+        observeSleepWake()
     }
 
     deinit {
         stopMonitoring()
+        removeSleepWakeObservers()
+    }
+
+    private func observeSleepWake() {
+        let sleepObserver = NotificationCenter.default.addObserver(
+            forName: SleepWakeManager.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.pauseMonitoring()
+        }
+
+        let wakeObserver = NotificationCenter.default.addObserver(
+            forName: SleepWakeManager.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.resumeMonitoring()
+        }
+
+        sleepWakeObservers.append(contentsOf: [sleepObserver, wakeObserver])
+    }
+
+    private func removeSleepWakeObservers() {
+        sleepWakeObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        sleepWakeObservers.removeAll()
+    }
+
+    private func pauseMonitoring() {
+        fallbackTimer?.invalidate()
+        fallbackTimer = nil
+    }
+
+    private func resumeMonitoring() {
+        // Restart the appropriate monitoring based on provider
+        if provider is AnySpacesProvider {
+            let runningApps = NSWorkspace.shared.runningApplications.compactMap {
+                $0.localizedName?.lowercased()
+            }
+            if runningApps.contains("yabai") {
+                // Resume fallback timer for yabai (Darwin notifications stay active)
+                fallbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                    self?.loadSpaces()
+                }
+            } else if runningApps.contains("aerospace") {
+                startFallbackMonitoring()
+            }
+        }
+        // Refresh spaces immediately on wake
+        loadSpaces()
     }
 
     /// Start event-driven monitoring using yabai signals (via Darwin notifications)

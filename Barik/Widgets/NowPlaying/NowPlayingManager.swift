@@ -114,13 +114,55 @@ final class NowPlayingManager: ObservableObject {
 
     @Published private(set) var nowPlaying: NowPlayingSong?
     private var cancellable: AnyCancellable?
+    private var sleepWakeObservers: [NSObjectProtocol] = []
 
     private init() {
+        startMonitoring()
+        observeSleepWake()
+    }
+
+    deinit {
+        stopMonitoring()
+        removeSleepWakeObservers()
+    }
+
+    private func observeSleepWake() {
+        let sleepObserver = NotificationCenter.default.addObserver(
+            forName: SleepWakeManager.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.stopMonitoring()
+        }
+
+        let wakeObserver = NotificationCenter.default.addObserver(
+            forName: SleepWakeManager.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.startMonitoring()
+        }
+
+        sleepWakeObservers.append(contentsOf: [sleepObserver, wakeObserver])
+    }
+
+    private func removeSleepWakeObservers() {
+        sleepWakeObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        sleepWakeObservers.removeAll()
+    }
+
+    private func startMonitoring() {
+        guard cancellable == nil else { return }
         cancellable = Timer.publish(every: 0.3, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 self?.updateNowPlaying()
             }
+    }
+
+    private func stopMonitoring() {
+        cancellable?.cancel()
+        cancellable = nil
     }
 
     /// Updates the now playing song asynchronously.
