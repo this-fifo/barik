@@ -58,7 +58,7 @@ class YabaiSpacesProvider: SpacesProvider, SwitchableSpacesProvider {
             return nil
         }
         let filteredWindows = windows.filter {
-            !($0.isHidden || $0.isSticky || ($0.isFloating && $0.title.trimmingCharacters(in: .whitespaces).isEmpty))
+            $0.opacity > 0 && !($0.isHidden || $0.isSticky || ($0.isFloating && $0.title.trimmingCharacters(in: .whitespaces).isEmpty))
         }
         var spaceDict = Dictionary(
             uniqueKeysWithValues: spaces.map { ($0.id, $0) })

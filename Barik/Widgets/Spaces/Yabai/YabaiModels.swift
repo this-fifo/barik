@@ -10,6 +10,7 @@ struct YabaiWindow: WindowModel {
     let isHidden: Bool
     let isFloating: Bool
     let isSticky: Bool
+    let opacity: Float
     let spaceId: Int
 
     enum CodingKeys: String, CodingKey {
@@ -22,6 +23,7 @@ struct YabaiWindow: WindowModel {
         case isHidden = "is-hidden"
         case isFloating = "is-floating"
         case isSticky = "is-sticky"
+        case opacity
     }
 
     init(from decoder: Decoder) throws {
@@ -38,6 +40,7 @@ struct YabaiWindow: WindowModel {
         isHidden = try container.decode(Bool.self, forKey: .isHidden)
         isFloating = try container.decode(Bool.self, forKey: .isFloating)
         isSticky = try container.decode(Bool.self, forKey: .isSticky)
+        opacity = try container.decode(Float.self, forKey: .opacity)
         if let name = appName {
             appIcon = IconCache.shared.icon(for: name)
         }
