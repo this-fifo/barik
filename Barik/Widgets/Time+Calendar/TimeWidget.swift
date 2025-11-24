@@ -14,7 +14,11 @@ struct TimeWidget: View {
         calendarConfig?["format"]?.stringValue ?? "J:mm"
     }
     var calendarShowEvents: Bool {
-        calendarConfig?["show-events"]?.boolValue ?? true
+        // Check widget-specific config first, then fall back to calendar.show-events
+        if let widgetShowEvents = config["show-events"]?.boolValue {
+            return widgetShowEvents
+        }
+        return calendarConfig?["show-events"]?.boolValue ?? true
     }
 
     @State private var currentTime = Date()
