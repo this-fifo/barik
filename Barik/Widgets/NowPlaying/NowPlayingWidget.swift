@@ -183,23 +183,138 @@ struct SongTextView: View {
 
         VStack(alignment: .leading, spacing: -1) {
             if foregroundHeight >= 30 {
-                Text(song.title)
-                    .font(.system(size: 11))
-                    .fontWeight(.medium)
+                ScrollingText(text: song.title, font: .system(size: 11), fontWeight: .medium)
                     .padding(.trailing, 2)
-                Text(song.artist)
-                    .opacity(0.8)
-                    .font(.system(size: 10))
+                ScrollingText(text: song.artist, font: .system(size: 10), opacity: 0.8)
                     .padding(.trailing, 2)
             } else {
-                Text(song.artist + " — " + song.title)
-                    .font(.system(size: 12))
+                ScrollingText(
+                    text: song.artist + " — " + song.title,
+                    font: .system(size: 12)
+                )
             }
         }
         // Disable animations for text changes.
         .transaction { transaction in
             transaction.animation = nil
         }
+    }
+}
+
+// MARK: - Scrolling Text View
+
+/// A view that scrolls text horizontally if it's too long to fit.
+struct ScrollingText: View {
+    let text: String
+    let font: Font
+    var fontWeight: Font.Weight = .regular
+    var opacity: Double = 1.0
+    var maxWidth: CGFloat = 150
+
+    @State private var offset: CGFloat = 0
+    @State private var textWidth: CGFloat = 0
+    @State private var shouldScroll: Bool = false
+    @State private var timer: Timer?
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Measure text width invisibly
+            Text(text)
+                .font(font)
+                .fontWeight(fontWeight)
+                .fixedSize()
+                .opacity(0)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear
+                            .onAppear {
+                                updateScrolling(width: geo.size.width)
+                            }
+                            .onChange(of: geo.size.width) { _, newWidth in
+                                updateScrolling(width: newWidth)
+                            }
+                    }
+                )
+
+            // Display scrolling or static text
+            if shouldScroll {
+                HStack(spacing: 40) {
+                    Text(text)
+                        .font(font)
+                        .fontWeight(fontWeight)
+                    Text(text)
+                        .font(font)
+                        .fontWeight(fontWeight)
+                }
+                .fixedSize()
+                .offset(x: offset)
+            } else {
+                Text(text)
+                    .font(font)
+                    .fontWeight(fontWeight)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: maxWidth, alignment: .leading)
+        .clipped()
+        .opacity(opacity)
+        .onChange(of: text) { _, _ in
+            stopScrolling()
+            offset = 0
+        }
+        .onDisappear {
+            stopScrolling()
+        }
+    }
+
+    private func updateScrolling(width: CGFloat) {
+        textWidth = width
+        let needsScroll = width > maxWidth
+
+        if needsScroll != shouldScroll {
+            shouldScroll = needsScroll
+            stopScrolling()
+
+            if shouldScroll {
+                offset = 0
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [self] in
+                    startScrolling()
+                }
+            }
+        }
+    }
+
+    private func startScrolling() {
+        guard shouldScroll else { return }
+
+        let scrollDistance = textWidth + 40
+        let pixelsPerSecond: CGFloat = 30.0
+        let duration = scrollDistance / pixelsPerSecond
+        let fps: CGFloat = 60.0
+        let frameInterval = 1.0 / fps
+        let pixelsPerFrame = pixelsPerSecond / fps
+
+        timer = Timer.scheduledTimer(withTimeInterval: frameInterval, repeats: true) { _ in
+            offset -= pixelsPerFrame
+
+            if offset <= -scrollDistance {
+                offset = 0
+            }
+        }
+    }
+
+    private func stopScrolling() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
+// MARK: - Text Width Preference Key
+
+struct TextWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

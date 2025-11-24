@@ -137,18 +137,21 @@ private struct NowPlayingVerticalPopup: View {
                             .font(.system(size: 20))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .focusable(false)
 
                     Button(action: { playingManager.togglePlayPause() }) {
                         Image(systemName: song.state == .paused ? "play.fill" : "pause.fill")
                             .font(.system(size: 30))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .focusable(false)
 
                     Button(action: { playingManager.nextTrack() }) {
                         Image(systemName: "forward.fill")
                             .font(.system(size: 20))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .focusable(false)
                 }
             }
             .padding(.horizontal, 25)
@@ -246,18 +249,21 @@ struct NowPlayingHorizontalPopup: View {
                             .font(.system(size: 20))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .focusable(false)
 
                     Button(action: { playingManager.togglePlayPause() }) {
                         Image(systemName: song.state == .paused ? "play.fill" : "pause.fill")
                             .font(.system(size: 30))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .focusable(false)
 
                     Button(action: { playingManager.nextTrack() }) {
                         Image(systemName: "forward.fill")
                             .font(.system(size: 20))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .focusable(false)
                 }
             }
             .padding(.horizontal, 25)
