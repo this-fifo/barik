@@ -57,7 +57,11 @@ struct MenuBarView: View {
         case "default.time":
             TimeWidget(calendarManager: CalendarManager(configProvider: config))
                 .environmentObject(config)
-            
+
+        case "default.nextmeeting":
+            NextMeetingWidget(calendarManager: CalendarManager(configProvider: config))
+                .environmentObject(config)
+
         case "default.nowplaying":
             NowPlayingWidget()
                 .environmentObject(config)

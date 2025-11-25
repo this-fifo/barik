@@ -19,6 +19,7 @@ class CalendarManager: ObservableObject {
     }
 
     @Published var nextEvent: EKEvent?
+    @Published var nextMeeting: EKEvent?
     @Published var todaysEvents: [EKEvent] = []
     @Published var tomorrowsEvents: [EKEvent] = []
     private let eventStore = EKEventStore()
@@ -69,10 +70,12 @@ class CalendarManager: ObservableObject {
             self?.fetchTodaysEvents()
             self?.fetchTomorrowsEvents()
             self?.fetchNextEvent()
+            self?.fetchNextMeeting()
         }
         fetchTodaysEvents()
         fetchTomorrowsEvents()
         fetchNextEvent()
+        fetchNextMeeting()
     }
 
     private func stopMonitoring() {
@@ -86,6 +89,7 @@ class CalendarManager: ObservableObject {
                 self?.fetchTodaysEvents()
                 self?.fetchTomorrowsEvents()
                 self?.fetchNextEvent()
+                self?.fetchNextMeeting()
             } else {
                 print(
                     "Calendar access not granted: \(String(describing: error))")
@@ -102,6 +106,21 @@ class CalendarManager: ObservableObject {
             filtered = filtered.filter { !denyList.contains($0.calendar.title) }
         }
         return filtered
+    }
+
+    private func containsMeetingURL(_ event: EKEvent) -> Bool {
+        let meetingPatterns = ["zoom.us", "meet.google", "teams.microsoft", "webex", "gotomeeting"]
+        let textToSearch = [event.url?.absoluteString, event.notes, event.location]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
+        return meetingPatterns.contains { textToSearch.contains($0) }
+    }
+
+    private func isMeeting(_ event: EKEvent) -> Bool {
+        let hasAttendees = (event.attendees?.count ?? 0) > 0
+        let hasMeetingURL = containsMeetingURL(event)
+        return hasAttendees || hasMeetingURL
     }
 
     func fetchNextEvent() {
@@ -125,6 +144,30 @@ class CalendarManager: ObservableObject {
         let next = regularEvents.first ?? filteredEvents.first
         DispatchQueue.main.async {
             self.nextEvent = next
+        }
+    }
+
+    func fetchNextMeeting() {
+        let calendars = eventStore.calendars(for: .event)
+        let now = Date()
+        let calendar = Calendar.current
+        guard
+            let endOfDay = calendar.date(
+                bySettingHour: 23, minute: 59, second: 59, of: now)
+        else {
+            print("Failed to get end of day.")
+            return
+        }
+        let predicate = eventStore.predicateForEvents(
+            withStart: now, end: endOfDay, calendars: calendars)
+        let events = eventStore.events(matching: predicate).sorted {
+            $0.startDate < $1.startDate
+        }
+        let filteredEvents = filterEvents(events)
+        let meetings = filteredEvents.filter { !$0.isAllDay && isMeeting($0) }
+        let next = meetings.first
+        DispatchQueue.main.async {
+            self.nextMeeting = next
         }
     }
 
