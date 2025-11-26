@@ -6,7 +6,7 @@ struct NetworkWidget: View {
     @State private var rect: CGRect = .zero
 
     var body: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: 10) {
             if viewModel.wifiState != .notSupported {
                 wifiIcon
             }
@@ -14,6 +14,10 @@ struct NetworkWidget: View {
                 ethernetIcon
             }
         }
+        .font(.system(size: 14))
+        .contentShape(Rectangle())
+        .experimentalConfiguration(cornerRadius: 15)
+        .frame(maxHeight: .infinity)
         .background(
             GeometryReader { geometry in
                 Color.clear
@@ -23,10 +27,6 @@ struct NetworkWidget: View {
                     }
             }
         )
-        .contentShape(Rectangle())
-        .font(.system(size: 15))
-        .experimentalConfiguration(cornerRadius: 15)
-        .frame(maxHeight: .infinity)
         .background(.black.opacity(0.001))
         .onTapGesture {
             MenuBarPopup.show(rect: rect, id: "network") { NetworkPopup() }
@@ -37,26 +37,33 @@ struct NetworkWidget: View {
         if viewModel.ssid == "Not connected" {
             return Image(systemName: "wifi.slash")
                 .foregroundColor(.red)
+                .offset(y: -1)
         }
         switch viewModel.wifiState {
         case .connected:
             return Image(systemName: "wifi")
                 .foregroundColor(.foregroundOutside)
+                .offset(y: -1)
         case .connecting:
             return Image(systemName: "wifi")
                 .foregroundColor(.yellow)
+                .offset(y: -1)
         case .connectedWithoutInternet:
             return Image(systemName: "wifi.exclamationmark")
                 .foregroundColor(.yellow)
+                .offset(y: -1)
         case .disconnected:
             return Image(systemName: "wifi.slash")
                 .foregroundColor(.gray)
+                .offset(y: -1)
         case .disabled:
             return Image(systemName: "wifi.slash")
                 .foregroundColor(.red)
+                .offset(y: -1)
         case .notSupported:
             return Image(systemName: "wifi.exclamationmark")
                 .foregroundColor(.gray)
+                .offset(y: -1)
         }
     }
 
@@ -64,18 +71,23 @@ struct NetworkWidget: View {
         switch viewModel.ethernetState {
         case .connected:
             return Image(systemName: "network")
+                .font(.system(size: 15))
                 .foregroundColor(.primary)
         case .connectedWithoutInternet:
             return Image(systemName: "network")
+                .font(.system(size: 15))
                 .foregroundColor(.yellow)
         case .connecting:
             return Image(systemName: "network.slash")
+                .font(.system(size: 15))
                 .foregroundColor(.yellow)
         case .disconnected:
             return Image(systemName: "network.slash")
+                .font(.system(size: 15))
                 .foregroundColor(.red)
         case .disabled, .notSupported:
             return Image(systemName: "questionmark.circle")
+                .font(.system(size: 15))
                 .foregroundColor(.gray)
         }
     }
