@@ -18,6 +18,22 @@
 
 **barik** is a lightweight macOS menu bar replacement. If you use [**yabai**](https://github.com/koekeishiya/yabai) or [**AeroSpace**](https://github.com/nikitabobko/AeroSpace) for tiling WM, you can display the current space in a sleek macOS-style panel with smooth animations. This makes it easy to see which number to press to switch spaces.
 
+---
+
+> **Fork Notice:** This is a personal fork of [mocki-toki/barik](https://github.com/mocki-toki/barik) with additional features:
+>
+> - **NextMeetingWidget** - Standalone widget showing your next meeting with attendees or meeting links
+> - **System widget** - Apple logo display (`default.system`)
+> - **Floating windows in spaces** - Shows floating/non-tiled windows alongside tiled ones
+> - **Improved responsiveness** - Event-driven updates using Darwin notifications, parallel queries
+> - **Sleep/wake handling** - Pauses background services during system sleep
+> - **Scrolling text** - Marquee effect for long song titles in NowPlaying widget
+> - **Per-widget calendar config** - Each TimeWidget can have its own `show-events` setting
+>
+> See the [original repo](https://github.com/mocki-toki/barik) for installation and base documentation. To use this fork, build from source with Xcode.
+
+---
+
 <br>
 
 <div align="center">
