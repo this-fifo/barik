@@ -7,12 +7,19 @@ struct RootToml: Decodable {
     var aerospace: AerospaceConfig?
     var experimental: ExperimentalConfig?
     var widgets: WidgetsSection
+    var builtinDisplay: BuiltinDisplayConfig?
 
     init() {
         self.theme = nil
         self.yabai = nil
         self.aerospace = nil
         self.widgets = WidgetsSection(displayed: [], others: [:])
+        self.builtinDisplay = nil
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case theme, yabai, aerospace, experimental, widgets
+        case builtinDisplay = "builtin-display"
     }
 }
 
@@ -26,17 +33,21 @@ struct Config {
     var theme: String {
         rootToml.theme ?? "light"
     }
-    
+
     var yabai: YabaiConfig {
         rootToml.yabai ?? YabaiConfig()
     }
-    
+
     var aerospace: AerospaceConfig {
         rootToml.aerospace ?? AerospaceConfig()
     }
-    
+
     var experimental: ExperimentalConfig {
         rootToml.experimental ?? ExperimentalConfig()
+    }
+
+    var builtinDisplay: BuiltinDisplayConfig {
+        rootToml.builtinDisplay ?? BuiltinDisplayConfig()
     }
 }
 
@@ -243,6 +254,23 @@ struct AerospaceConfig: Decodable {
         } else {
             self.path = "/opt/homebrew/bin/aerospace"
         }
+    }
+}
+
+struct BuiltinDisplayConfig: Decodable {
+    let hiddenWidgets: [String]
+
+    init() {
+        self.hiddenWidgets = []
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hiddenWidgets = try container.decodeIfPresent([String].self, forKey: .hiddenWidgets) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case hiddenWidgets = "hidden-widgets"
     }
 }
 

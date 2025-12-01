@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @ObservedObject var configManager = ConfigManager.shared
+    @ObservedObject var displayManager = DisplayManager.shared
 
     var body: some View {
         let theme: ColorScheme? =
@@ -14,7 +15,11 @@ struct MenuBarView: View {
                 .none
             }
 
-        let items = configManager.config.rootToml.widgets.displayed
+        let allItems = configManager.config.rootToml.widgets.displayed
+        let hiddenWidgets = displayManager.isBuiltinDisplay
+            ? configManager.config.builtinDisplay.hiddenWidgets
+            : []
+        let items = allItems.filter { !hiddenWidgets.contains($0.id) }
 
         HStack(spacing: 0) {
             HStack(spacing: configManager.config.experimental.foreground.spacing) {
@@ -71,7 +76,9 @@ struct MenuBarView: View {
                 .environmentObject(config)
 
         case "spacer":
-            Spacer().frame(minWidth: 50, maxWidth: .infinity)
+            // On notched displays, ensure spacer is wide enough to keep content out of notch
+            let minWidth = max(50, displayManager.notchSpacerWidth)
+            Spacer().frame(minWidth: minWidth, maxWidth: .infinity)
 
         case "divider":
             Rectangle()
