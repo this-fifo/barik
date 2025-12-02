@@ -75,6 +75,10 @@ struct MenuBarView: View {
             AudioOutputWidget()
                 .environmentObject(config)
 
+        case "default.caffeinate":
+            CaffeinateWidget()
+                .environmentObject(config)
+
         case "spacer":
             // On notched displays, ensure spacer is wide enough to keep content out of notch
             let minWidth = max(50, displayManager.notchSpacerWidth)
