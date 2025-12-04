@@ -13,6 +13,7 @@ A lightweight macOS menu bar replacement for use with [yabai](https://github.com
 | `default.system` | Apple logo, opens System Settings on click |
 | `default.spaces` | Current spaces with window icons (supports floating windows) |
 | `default.caffeinate` | Toggle sleep prevention (allows display sleep) |
+| `default.iterm` | iTerm2 session tracker with Claude Code integration |
 | `default.nextmeeting` | Shows next calendar event with attendees/meeting links |
 | `default.nowplaying` | Currently playing track with scrolling text |
 | `default.audiooutput` | Audio output device selector |

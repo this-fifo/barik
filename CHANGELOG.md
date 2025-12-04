@@ -2,6 +2,15 @@
 
 ## Fork Changes (this-fifo)
 
+### 2024-12-03
+
+- Added `default.iterm` widget - iTerm2 session tracker with live state indicators
+  - Shows active terminal sessions with command and working directory
+  - Fish shell integration for command start/end tracking
+  - Claude Code hooks for tool_use/waiting state visibility
+  - Visual indicators: blue (activity), orange (waiting for input), red (failure)
+  - Native macOS popover with session details
+
 ### 2024-12-02
 
 - Added `default.caffeinate` widget - toggle sleep prevention using IOKit power assertions
