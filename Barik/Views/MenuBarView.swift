@@ -79,6 +79,10 @@ struct MenuBarView: View {
             CaffeinateWidget()
                 .environmentObject(config)
 
+        case "default.iterm":
+            ITermWidget()
+                .environmentObject(config)
+
         case "spacer":
             // On notched displays, ensure spacer is wide enough to keep content out of notch
             let minWidth = max(50, displayManager.notchSpacerWidth)
