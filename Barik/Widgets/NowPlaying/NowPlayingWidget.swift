@@ -223,7 +223,7 @@ struct ScrollingText: View {
                 .font(font)
                 .fontWeight(fontWeight)
                 .fixedSize()
-                .opacity(0)
+                .hidden()
                 .background(
                     GeometryReader { geo in
                         Color.clear
@@ -235,6 +235,7 @@ struct ScrollingText: View {
                             }
                     }
                 )
+                .frame(width: 0, height: 0)
 
             // Display scrolling or static text
             if shouldScroll {
@@ -254,9 +255,11 @@ struct ScrollingText: View {
                     .font(font)
                     .fontWeight(fontWeight)
                     .lineLimit(1)
-                    .fixedSize()
+                    .truncationMode(.tail)
+                    .frame(width: min(textWidth, maxWidth), alignment: .leading)
             }
         }
+        .frame(width: min(textWidth > 0 ? textWidth : maxWidth, maxWidth), alignment: .leading)
         .clipped()
         .opacity(opacity)
         .onChange(of: text) { _, _ in
