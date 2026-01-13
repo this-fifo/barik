@@ -213,6 +213,7 @@ private struct WindowView: View {
 private struct WindowGroupView: View {
     @EnvironmentObject var viewModel: SpacesViewModel
     @ObservedObject var displayManager = DisplayManager.shared
+    @ObservedObject var configManager = ConfigManager.shared
 
     let group: WindowGroup
     let space: AnySpace
@@ -221,6 +222,14 @@ private struct WindowGroupView: View {
     @State private var popoverFrame: CGRect = .zero
 
     private let iconSize: CGFloat = 21
+
+    private var colorScheme: ColorScheme? {
+        switch configManager.config.rootToml.theme {
+        case "dark": return .dark
+        case "light": return .light
+        default: return nil
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -275,7 +284,8 @@ private struct WindowGroupView: View {
             space: space,
             anchorFrame: popoverFrame,
             viewModel: viewModel,
-            hasNotch: displayManager.hasNotch
+            hasNotch: displayManager.hasNotch,
+            colorScheme: colorScheme
         )
     }
 
@@ -297,7 +307,8 @@ class WindowGroupPopover {
         space: AnySpace,
         anchorFrame: CGRect,
         viewModel: SpacesViewModel,
-        hasNotch: Bool
+        hasNotch: Bool,
+        colorScheme: ColorScheme?
     ) {
         hideTimer?.invalidate()
         hideTimer = nil
@@ -305,7 +316,7 @@ class WindowGroupPopover {
         // Dismiss existing panel
         panel?.close()
 
-        // Create content view
+        // Create content view with theme support
         let contentView = WindowGroupPopoverContent(
             group: group,
             space: space,
@@ -321,6 +332,7 @@ class WindowGroupPopover {
                 }
             }
         )
+        .preferredColorScheme(colorScheme)
 
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.wantsLayer = true
