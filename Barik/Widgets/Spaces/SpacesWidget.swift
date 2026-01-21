@@ -8,7 +8,7 @@ struct SpacesWidget: View {
 
     var body: some View {
         HStack(spacing: foregroundHeight < 30 ? 0 : 4) {
-            ForEach(viewModel.spaces) { space in
+            ForEach(viewModel.spaces.filter { !$0.windows.isEmpty }) { space in
                 SpaceView(space: space)
             }
         }
@@ -44,7 +44,7 @@ private struct SpaceView: View {
     @ObservedObject var configManager = ConfigManager.shared
     var foregroundHeight: CGFloat { configManager.config.experimental.foreground.resolveHeight() }
 
-    var showKey: Bool { spaceConfig["show-key"]?.boolValue ?? true }
+    var showKey: Bool { spaceConfig["show-key"]?.boolValue ?? false }
     var compactMode: Bool { config["compact-mode"]?.boolValue ?? false }
 
     let space: AnySpace
