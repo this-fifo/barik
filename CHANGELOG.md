@@ -2,6 +2,11 @@
 
 ## Fork Changes (this-fifo)
 
+### 2025-01-21
+
+- Hide empty spaces from view (spaces with no windows are filtered out)
+- Default `show-key` to false (space numbers hidden by default)
+
 ### 2024-12-03
 
 - Added `default.iterm` widget - iTerm2 session tracker with live state indicators
